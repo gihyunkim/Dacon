@@ -1,29 +1,25 @@
-from utils import *
 import pandas as pd
 from regressor import RegressionModel
+import numpy as np
 
 def main():
     train_data_path = "./datasets/train.csv"
     test_data_path = "./datasets/test.csv"
 
-    plt.rcParams['axes.unicode_minus'] = False
-    plt.rcParams['font.family'] = 'NanumGothic'
+    '''Set Dataframe'''
     df = pd.DataFrame(pd.read_csv(train_data_path))
     df_test = pd.DataFrame(pd.read_csv(test_data_path))
 
     reg = RegressionModel(df, df_test)
 
-    mlr1, mlr2 = reg.train(df)
+    '''train'''
+    mlr_lunch, mlr_dinner = reg.train(df, method="rfg")
 
-    df3 = pd.DataFrame(pd.read_csv("./datasets/sample_submission.csv"))
+    '''test'''
+    pred_lunch, pred_dinner = reg.predict(df_test, mlr_lunch, mlr_dinner)
 
-    pred_lunch = reg.predict(df_test, mlr1, "중식계")
-    df3["중식계"] = pred_lunch
-
-    pred_dinner = reg.predict(df_test,mlr2, "석식계")
-    df3["석식계"] = pred_dinner
-    df3 = df3.set_index("일자")
-    df3.to_csv("./result/sample_submission.csv", mode="w")
+    '''save result'''
+    reg.save_csv(pred_lunch, pred_dinner)
 
 if __name__ == "__main__":
     main()

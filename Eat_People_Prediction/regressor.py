@@ -5,12 +5,9 @@ from xgboost import XGBRegressor
 from sklearn.model_selection import GridSearchCV
 from lightgbm import LGBMRegressor
 from word2vec import GensimWord2Vec
-import matplotlib
 import os
 import numpy as np
 import copy
-
-matplotlib.font_manager._rebuild()
 
 day_dict = {"월":1, "화":2, "수":3, "목":4, "금":5}
 model_dict = {"lgb":LGBMRegressor(), "rfg":RandomForestRegressor(criterion="mae"),
@@ -67,6 +64,9 @@ class RegressionModel:
         return use_data
 
     def train(self, df, method='rfg'):
+        if not method in model_dict.keys():
+            print("Not supported method...Use in \n ['lgb':LGBMRegressor, 'rfg':RandomForest, 'xgb':XGBRegressor]")
+            exit(-1)
         use_data = self.preProcess(df)
 
         # sort
@@ -94,29 +94,28 @@ class RegressionModel:
             dinner_out = dinner_out.best_estimator_
         return lunch_out, dinner_out
 
-    def predict(self, df_test, mlr, mode="중식계"):
-        '''Data preprocess for test_data'''
-        use_data2 = self.preProcess(df_test)
+    def predict(self, df_test, mlr_lunch, mlr_dinner):
+        # preprocess
+        use_data_test = self.preProcess(df_test)
+        use_data_test = use_data_test[["월", "일", "요일", "남은인원", "본사출장자수", "본사시간외근무명령서승인건수", "중식메뉴_emb", "석식메뉴_emb"]]
+        x_common = use_data_test.iloc[:, :-2]
+        emb_arr_lunch = np.array(use_data_test.iloc[:, -2].to_numpy().tolist())
+        emb_arr_dinner = np.array(use_data_test.iloc[:, -1].to_numpy().tolist())
 
-        # sort
-        use_data2 = use_data2[["월", "일", "요일", "남은인원", "본사출장자수", "본사시간외근무명령서승인건수", "중식메뉴_emb", "석식메뉴_emb"]]
+        test_luncn_x = x_common.to_numpy() #np.concatenate((x_common.to_numpy(), emb_arr), axis=1)
+        test_dinner_x = x_common.to_numpy()
 
-        x_common = use_data2.iloc[:,:-2]
-        emb_arr_lunch = np.array(use_data2.iloc[:, -2].to_numpy().tolist())
-        emb_arr_dinner = np.array(use_data2.iloc[:, -1].to_numpy().tolist())
+        pred_lunch = mlr_lunch.predict(test_luncn_x)
+        pred_dinner = mlr_dinner.predict(test_dinner_x)
+        return pred_lunch, pred_dinner
 
-        '''lauch linear model'''
-        test_lunch_x = x_common.to_numpy() #np.concatenate((x_common.to_numpy(), emb_arr_lunch), axis=1)
-        test_dinner_x = x_common.to_numpy() #np.concatenate((x_common.to_numpy(), emb_arr_dinner), axis=1)
-
-        if mode=="중식계":
-            predicted = mlr.predict(test_lunch_x)
-
-        else:
-            predicted = mlr.predict(test_dinner_x)
-        print(predicted)
-        return predicted
-
+    def save_csv(self, pred_lunch, pred_dinner):
+        # save result
+        df3 = pd.DataFrame(pd.read_csv("./datasets/sample_submission.csv"))
+        df3["중식계"] = pred_lunch
+        df3["석식계"] = pred_dinner
+        df3 = df3.set_index("일자")
+        df3.to_csv("./result/sample_submission.csv", mode="w")
 
     # def predict(self, df_test, mlr, mlr2):
     #     '''Data preprocess for test_data'''
